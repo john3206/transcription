@@ -1,156 +1,224 @@
-<!DOCTYPE html>
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Transcrição de Fala para WhatsApp</title>
-  <style>
-    body {
-      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-      background-color: #e8f0fe;
-      margin: 0;
-      padding: 20px;
-      text-align: center;
-    }
-
-    h1 {
-      color: #1a73e8;
-    }
-
-    #transcricao {
-      margin: 20px auto;
-      padding: 15px;
-      width: 90%;
-      max-width: 600px;
-      min-height: 120px;
-      border: 2px dashed #1a73e8;
-      border-radius: 10px;
-      background-color: #fff;
-      font-size: 16px;
-      color: #333;
-      white-space: pre-wrap;
-    }
-
-    button {
-      margin: 10px;
-      padding: 12px 24px;
-      font-size: 16px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background 0.3s ease;
-    }
-
-    #btnTranscricao {
-      background-color: #1a73e8;
-      color: white;
-    }
-
-    #btnTranscricao.gravando {
-      background-color: #d93025;
-    }
-
-    #btnWhatsApp {
-      background-color: #25d366;
-      color: white;
-    }
-
-    #alerta {
-      color: #d93025;
-      font-weight: bold;
-    }
-
-    footer {
-      margin-top: 40px;
-      font-size: 13px;
-      color: #777;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Transcrição de Áudio</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #ffffff;
+            font-family: 'Inter', sans-serif;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        .transcription-box {
+            background-color: #ffffff;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            min-height: 100px;
+        }
+        .share-button, .record-button, .stop-button {
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: background-color 0.3s;
+            margin-right: 0.5rem;
+        }
+        .share-button {
+            background-color: #25D366;
+        }
+        .share-button:hover {
+            background-color: #20b958;
+        }
+        .record-button {
+            background-color: #ef4444;
+        }
+        .record-button:hover {
+            background-color: #dc2626;
+        }
+        .stop-button {
+            background-color: #6b7280;
+        }
+        .stop-button:hover {
+            background-color: #4b5563;
+        }
+        .whatsapp-icon, .record-icon, .stop-icon {
+            width: 20px;
+            height: 20px;
+        }
+        .error-message {
+            color: #ef4444;
+            margin-top: 1rem;
+            display: none;
+        }
+    </style>
 </head>
 <body>
-	
-  <h1>🎤 transcrition</h1>
+    <div class="container">
+        <h1 class="text-2xl font-bold text-gray-800 mb-6">Transcrição de Áudio</h1>
+        
+        <div class="mb-4">
+            <button class="record-button" onclick="startRecording()">
+                <svg class="record-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <circle cx="12" cy="12" r="10" fill="white"/>
+                </svg>
+                Iniciar Gravação
+            </button>
+            <button class="stop-button" onclick="stopRecording()" disabled>
+                <svg class="stop-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect x="6" y="6" width="12" height="12" fill="white"/>
+                </svg>
+                Parar Gravação
+            </button>
+        </div>
 
-  <div id="transcricao">Clique no botão para começar a falar.</div>
+        <div class="transcription-box">
+            <p class="text-gray-800 leading-relaxed" id="transcription-text"></p>
+        </div>
 
-  <button id="btnTranscricao" onclick="alternarGravacao()">🎙️ Iniciar Transcrição</button>
-  <button id="btnWhatsApp" onclick="compartilharWhatsApp()">📤 Compartilhar no WhatsApp</button>
+        <div class="error-message" id="error-message"></div>
 
-  <p id="alerta"></p>
+        <div class="mt-6">
+            <a href="https://wa.me/?text=Confira%20esta%20transcrição:%20" 
+               class="share-button" 
+               target="_blank" 
+               rel="noopener noreferrer">
+                <svg class="whatsapp-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM16.46 15.77C16.29 16.07 15.92 16.24 15.63 16.33C15.34 16.42 14.96 16.44 14.56 16.29C13.92 16.05 13.34 15.66 12.76 15.22C11.09 13.99 9.76 12.47 8.76 10.76C8.32 10.03 7.95 9.29 7.76 8.47C7.67 8.09 7.69 7.71 7.78 7.42C7.87 7.13 8.04 6.76 8.34 6.59C8.64 6.42 8.99 6.39 9.32 6.5C9.66 6.61 10.03 6.86 10.5 7.23C11.22 7.78 11.77 8.22 12.18 8.76C12.36 8.99 12.48 9.25 12.53 9.53C12.58 9.81 12.56 10.09 12.47 10.36C12.38 10.63 12.23 10.88 12.03 11.09C11.83 11.3 11.67 11.47 11.67 11.67C11.67 11.87 11.83 12.04 12.03 12.25C12.44 12.66 12.92 13.03 13.47 13.47C13.91 13.82 14.28 14.3 14.69 14.71C14.9 14.91 15.07 15.07 15.27 15.07C15.47 15.07 15.64 14.91 15.85 14.71C16.06 14.51 16.31 14.36 16.58 14.31C16.86 14.26 17.12 14.34 17.35 14.52C17.58 14.7 17.77 14.97 17.88 15.31C17.99 15.65 17.97 16 17.81 16.3C17.65 16.6 17.36 16.77 17.06 16.86C16.76 16.95 16.41 16.87 16.14 16.7C15.87 16.53 15.64 16.2 15.46 15.77H16.46Z" fill="white"/>
+                </svg>
+                Compartilhar no WhatsApp
+            </a>
+        </div>
+    </div>
 
- 
+    <script>
+        let mediaRecorder;
+        let recordedChunks = [];
+        const transcriptionText = document.getElementById('transcription-text');
+        const recordButton = document.querySelector('.record-button');
+        const stopButton = document.querySelector('.stop-button');
+        const errorMessage = document.getElementById('error-message');
 
-  <script>
-    let reconhecimento;
-    let gravando = false;
-    let textoFinal = '';
-
-    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-      document.getElementById('alerta').innerText = '❌ Seu navegador não suporta reconhecimento de voz. Use o Chrome no celular ou PC.';
-    } else {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      reconhecimento = new SpeechRecognition();
-      reconhecimento.lang = 'pt-BR';
-      reconhecimento.interimResults = true;
-      reconhecimento.continuous = false;
-
-      reconhecimento.onresult = (event) => {
-        let texto = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          texto += event.results[i][0].transcript;
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = 'block';
         }
-        textoFinal = texto;
-        document.getElementById('transcricao').innerText = texto;
-      };
 
-      reconhecimento.onerror = (event) => {
-        document.getElementById('alerta').innerText = 'Erro: ' + event.error;
-        pararGravacao();
-      };
+        function clearError() {
+            errorMessage.textContent = '';
+            errorMessage.style.display = 'none';
+        }
 
-      reconhecimento.onend = () => {
-        pararGravacao();
-      };
-    }
+        async function startRecording() {
+            // Verifica se o navegador suporta a API MediaRecorder
+            if (!navigator.mediaDevices || !window.MediaRecorder) {
+                showError('Seu navegador não suporta gravação de áudio. Use um navegador moderno como Chrome ou Firefox.');
+                return;
+            }
 
-    function alternarGravacao() {
-      if (gravando) {
-        pararGravacao();
-      } else {
-        iniciarGravacao();
-      }
-    }
+            // Verifica se a página está sendo servida via HTTPS
+            if (window.location.protocol !== 'https:') {
+                showError('A gravação de áudio requer uma conexão segura (HTTPS). Acesse esta página via HTTPS.');
+                return;
+            }
 
-    function iniciarGravacao() {
-      if (!reconhecimento) return;
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                recordedChunks = [];
 
-      gravando = true;
-      textoFinal = '';
-      document.getElementById('transcricao').innerText = '🎙️ Ouvindo...';
-      document.getElementById('btnTranscricao').innerText = '🛑 Parar';
-      document.getElementById('btnTranscricao').classList.add('gravando');
-      reconhecimento.start();
-    }
+                mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        recordedChunks.push(event.data);
+                    }
+                };
 
-    function pararGravacao() {
-      if (!reconhecimento) return;
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(recordedChunks, { type: 'audio/webm' });
+                    // Simulação de transcrição (substitua por API de transcrição real)
+                    transcriptionText.textContent = 'Transcrição de exemplo do áudio gravado.';
+                    updateWhatsAppLink();
+                    stream.getTracks().forEach(track => track.stop()); // Para o acesso ao microfone
+                };
 
-      gravando = false;
-      document.getElementById('btnTranscricao').innerText = '🎙️ Iniciar Transcrição';
-      document.getElementById('btnTranscricao').classList.remove('gravando');
-      reconhecimento.stop();
-    }
+                mediaRecorder.start();
+                recordButton.disabled = true;
+                stopButton.disabled = false;
+                clearError();
+            } catch (err) {
+                console.error('Erro ao acessar o microfone:', err);
+                if (err.name === 'NotAllowedError') {
+                    showError('Permissão para acessar o microfone foi negada. Verifique as configurações de permissão do navegador.');
+                } else if (err.name === 'NotFoundError') {
+                    showError('Nenhum microfone foi encontrado. Verifique se um microfone está conectado.');
+                } else {
+                    showError(`Erro ao acessar o microfone: ${err.message}`);
+                }
+            }
+        }
 
-    function compartilharWhatsApp() {
-      if (!textoFinal) {
-        alert('Nenhuma transcrição para compartilhar!');
-        return;
-      }
-      const texto = encodeURIComponent(textoFinal.trim());
-      const link = `https://wa.me/?text=${texto}`;
-      window.open(link, '_blank');
-    }
-  </script>
+        function stopRecording() {
+            if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+                mediaRecorder.stop();
+                recordButton.disabled = false;
+                stopButton.disabled = true;
+            }
+        }
 
+        function updateWhatsAppLink() {
+            const text = transcriptionText.textContent || 'Confira esta transcrição!';
+            const encodedText = encodeURIComponent(`Confira esta transcrição: ${text}`);
+            const whatsappLink = document.querySelector('.share-button');
+            whatsappLink.href = `https://wa.me/?text=${encodedText}`;
+        }
+    </script>
 </body>
 </html>
