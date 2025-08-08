@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Transcrição de Fala para WhatsApp</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background-color: #e8f0fe;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #1a73e8;
+    }
+
+    #transcricao {
+      margin: 20px auto;
+      padding: 15px;
+      width: 90%;
+      max-width: 600px;
+      min-height: 120px;
+      border: 2px dashed #1a73e8;
+      border-radius: 10px;
+      background-color: #fff;
+      font-size: 16px;
+      color: #333;
+      white-space: pre-wrap;
+    }
+
+    button {
+      margin: 10px;
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    #btnTranscricao {
+      background-color: #1a73e8;
+      color: white;
+    }
+
+    #btnTranscricao.gravando {
+      background-color: #d93025;
+    }
+
+    #btnWhatsApp {
+      background-color: #25d366;
+      color: white;
+    }
+
+    #alerta {
+      color: #d93025;
+      font-weight: bold;
+    }
+
+    footer {
+      margin-top: 40px;
+      font-size: 13px;
+      color: #777;
+    }
+  </style>
+</head>
+<body>
+	
+  <h1>🎤 transcrition</h1>
+
+  <div id="transcricao">Clique no botão para começar a falar.</div>
+
+  <button id="btnTranscricao" onclick="alternarGravacao()">🎙️ Iniciar Transcrição</button>
+  <button id="btnWhatsApp" onclick="compartilharWhatsApp()">📤 Compartilhar no WhatsApp</button>
+
+  <p id="alerta"></p>
+
+ 
+
+  <script>
+    let reconhecimento;
+    let gravando = false;
+    let textoFinal = '';
+
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      document.getElementById('alerta').innerText = '❌ Seu navegador não suporta reconhecimento de voz. Use o Chrome no celular ou PC.';
+    } else {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      reconhecimento = new SpeechRecognition();
+      reconhecimento.lang = 'pt-BR';
+      reconhecimento.interimResults = true;
+      reconhecimento.continuous = false;
+
+      reconhecimento.onresult = (event) => {
+        let texto = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          texto += event.results[i][0].transcript;
+        }
+        textoFinal = texto;
+        document.getElementById('transcricao').innerText = texto;
+      };
+
+      reconhecimento.onerror = (event) => {
+        document.getElementById('alerta').innerText = 'Erro: ' + event.error;
+        pararGravacao();
+      };
+
+      reconhecimento.onend = () => {
+        pararGravacao();
+      };
+    }
+
+    function alternarGravacao() {
+      if (gravando) {
+        pararGravacao();
+      } else {
+        iniciarGravacao();
+      }
+    }
+
+    function iniciarGravacao() {
+      if (!reconhecimento) return;
+
+      gravando = true;
+      textoFinal = '';
+      document.getElementById('transcricao').innerText = '🎙️ Ouvindo...';
+      document.getElementById('btnTranscricao').innerText = '🛑 Parar';
+      document.getElementById('btnTranscricao').classList.add('gravando');
+      reconhecimento.start();
+    }
+
+    function pararGravacao() {
+      if (!reconhecimento) return;
+
+      gravando = false;
+      document.getElementById('btnTranscricao').innerText = '🎙️ Iniciar Transcrição';
+      document.getElementById('btnTranscricao').classList.remove('gravando');
+      reconhecimento.stop();
+    }
+
+    function compartilharWhatsApp() {
+      if (!textoFinal) {
+        alert('Nenhuma transcrição para compartilhar!');
+        return;
+      }
+      const texto = encodeURIComponent(textoFinal.trim());
+      const link = `https://wa.me/?text=${texto}`;
+      window.open(link, '_blank');
+    }
+  </script>
+
+</body>
+</html>
